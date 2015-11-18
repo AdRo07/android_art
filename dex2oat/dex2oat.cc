@@ -584,6 +584,9 @@ class Dex2Oat FINAL {
 
     std::string error_msg;
 
+    // Optimizing compiler produces dex files which crash on the Tegra2
+    bool force_quick_compiler = true;
+
     for (int i = 0; i < argc; i++) {
       const StringPiece option(argv[i]);
       const bool log_options = false;
@@ -604,6 +607,11 @@ class Dex2Oat FINAL {
         }
       } else if (option.starts_with("--zip-location=")) {
         zip_location_ = option.substr(strlen("--zip-location=")).data();
+
+        // if (zip_location_.compare("services.jar") == 0) {
+        //   force_quick_compiler = true;
+        // }
+
       } else if (option.starts_with("--oat-file=")) {
         oat_filename_ = option.substr(strlen("--oat-file=")).data();
       } else if (option.starts_with("--oat-symbols=")) {
@@ -839,6 +847,11 @@ class Dex2Oat FINAL {
       } else {
         Usage("Unknown argument %s", option.data());
       }
+    }
+
+    if (force_quick_compiler) {
+      requested_specific_compiler = true;
+      compiler_kind_ = Compiler::kQuick;
     }
 
     image_ = (!image_filename_.empty());
