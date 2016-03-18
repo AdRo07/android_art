@@ -263,6 +263,7 @@ $$(ENUM_OPERATOR_OUT_GEN): $$(GENERATED_SRC_DIR)/%_operator_out.cc : $(LOCAL_PAT
   ifeq ($$(art_target_or_host),target)
     # For atrace.
     LOCAL_SHARED_LIBRARIES += libcutils
+    LOCAL_CLANG := false
     include $(BUILD_SHARED_LIBRARY)
   else # host
     LOCAL_MULTILIB := both
