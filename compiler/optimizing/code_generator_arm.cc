@@ -55,7 +55,7 @@ static constexpr SRegister kFpuCalleeSaves[] =
 
 // D31 cannot be split into two S registers, and the register allocator only works on
 // S registers. Therefore there is no need to block it.
-static constexpr DRegister DTMP = D7;
+static constexpr DRegister DTMP = D31;
 
 static constexpr uint32_t kPackedSwitchCompareJumpThreshold = 7;
 
