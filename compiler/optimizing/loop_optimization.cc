@@ -29,7 +29,7 @@
 namespace art {
 
 // Enables vectorization (SIMDization) in the loop optimizer.
-static constexpr bool kEnableVectorization = true;
+static constexpr bool kEnableVectorization = false;
 
 // Remove the instruction from the graph. A bit more elaborate than the usual
 // instruction removal, since there may be a cycle in the use structure.
