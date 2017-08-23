@@ -29,7 +29,7 @@
 namespace art {
 
 // Enables vectorization (SIMDization) in the loop optimizer.
-static constexpr bool kEnableVectorization = true;
+static constexpr bool kEnableVectorization = false;
 
 // All current SIMD targets want 16-byte alignment.
 static constexpr size_t kAlignedBase = 16;
