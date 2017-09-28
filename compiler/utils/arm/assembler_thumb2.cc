@@ -3713,19 +3713,11 @@ void Thumb2Assembler::LoadImmediate(Register rd, int32_t value, Condition cond) 
 
 void Thumb2Assembler::LoadDImmediate(DRegister dd, double value, Condition cond) {
   if (!vmovd(dd, value, cond)) {
-    uint64_t int_value = bit_cast<uint64_t, double>(value);
-    if (int_value == bit_cast<uint64_t, double>(0.0)) {
-      // 0.0 is quite common, so we special case it by loading
-      // 2.0 in `dd` and then subtracting it.
-      bool success = vmovd(dd, 2.0, cond);
-      CHECK(success);
-      vsubd(dd, dd, dd, cond);
-    } else {
-      Literal* literal = literal64_dedupe_map_.GetOrCreate(
-          int_value,
-          [this, int_value]() { return NewLiteral<uint64_t>(int_value); });
-      LoadLiteral(dd, literal);
-    }
+      uint64_t int_value = bit_cast<uint64_t, double>(value);
+      LoadSImmediate(
+          static_cast<SRegister>(dd << 1), bit_cast<float, uint32_t>(Low32Bits(int_value)));
+      LoadSImmediate(
+          static_cast<SRegister>((dd << 1) + 1), bit_cast<float, uint32_t>(High32Bits(int_value)));
   }
 }
 

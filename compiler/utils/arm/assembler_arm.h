@@ -707,17 +707,8 @@ class ArmAssembler : public Assembler {
   virtual void LoadImmediate(Register rd, int32_t value, Condition cond = AL) = 0;
   void LoadSImmediate(SRegister sd, float value, Condition cond = AL) {
     if (!vmovs(sd, value, cond)) {
-      int32_t int_value = bit_cast<int32_t, float>(value);
-      if (int_value == bit_cast<int32_t, float>(0.0f)) {
-        // 0.0 is quite common, so we special case it by loading
-        // 2.0 in `sd` and then substracting it.
-        bool success = vmovs(sd, 2.0, cond);
-        CHECK(success);
-        vsubs(sd, sd, sd, cond);
-      } else {
-        LoadImmediate(IP, int_value, cond);
-        vmovsr(sd, IP, cond);
-      }
+      LoadImmediate(IP, bit_cast<int32_t, float>(value), cond);
+      vmovsr(sd, IP, cond);
     }
   }
 
