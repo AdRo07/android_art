@@ -2027,8 +2027,8 @@ CodeGeneratorARMVIXL::CodeGeneratorARMVIXL(HGraph* graph,
   AddAllocatedRegister(Location::RegisterLocation(LR));
   // Give D30 and D31 as scratch register to VIXL. The register allocator only works on
   // S0-S31, which alias to D0-D15.
-  GetVIXLAssembler()->GetScratchVRegisterList()->Combine(d31);
-  GetVIXLAssembler()->GetScratchVRegisterList()->Combine(d30);
+  // GetVIXLAssembler()->GetScratchVRegisterList()->Combine(d31);
+  // GetVIXLAssembler()->GetScratchVRegisterList()->Combine(d30);
 }
 
 void JumpTableARMVIXL::EmitTable(CodeGeneratorARMVIXL* codegen) {
