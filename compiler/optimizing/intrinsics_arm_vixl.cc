@@ -2784,6 +2784,51 @@ void IntrinsicCodeGeneratorARMVIXL::VisitShortReverseBytes(HInvoke* invoke) {
   __ Revsh(OutputRegister(invoke), InputRegisterAt(invoke, 0));
 }
 
+static void GenBitCount(HInvoke* instr, Primitive::Type type, ArmVIXLAssembler* assembler) {
+  DCHECK(Primitive::IsIntOrLongType(type)) << type;
+  DCHECK_EQ(instr->GetType(), Primitive::kPrimInt);
+  DCHECK_EQ(Primitive::PrimitiveKind(instr->InputAt(0)->GetType()), type);
+
+  bool is_long = type == Primitive::kPrimLong;
+  LocationSummary* locations = instr->GetLocations();
+  Location in = locations->InAt(0);
+  vixl32::Register src_0 = is_long ? LowRegisterFrom(in) : RegisterFrom(in);
+  vixl32::Register src_1 = is_long ? HighRegisterFrom(in) : src_0;
+  vixl32::SRegister tmp_s = LowSRegisterFrom(locations->GetTemp(0));
+  vixl32::DRegister tmp_d = DRegisterFrom(locations->GetTemp(0));
+  vixl32::Register  out_r = OutputRegister(instr);
+
+  // Move data from core register(s) to temp D-reg for bit count calculation, then move back.
+  // According to Cortex A57 and A72 optimization guides, compared to transferring to full D-reg,
+  // transferring data from core reg to upper or lower half of vfp D-reg requires extra latency,
+  // That's why for integer bit count, we use 'vmov d0, r0, r0' instead of 'vmov d0[0], r0'.
+  __ Vmov(tmp_d, src_1, src_0);     // Temp DReg |--src_1|--src_0|
+  __ Vcnt(Untyped8, tmp_d, tmp_d);  // Temp DReg |c|c|c|c|c|c|c|c|
+  __ Vpaddl(U8, tmp_d, tmp_d);      // Temp DReg |--c|--c|--c|--c|
+  __ Vpaddl(U16, tmp_d, tmp_d);     // Temp DReg |------c|------c|
+  if (is_long) {
+    __ Vpaddl(U32, tmp_d, tmp_d);   // Temp DReg |--------------c|
+  }
+  __ Vmov(out_r, tmp_s);
+}
+
+void IntrinsicLocationsBuilderARMVIXL::VisitIntegerBitCount(HInvoke* invoke) {
+  CreateIntToIntLocations(arena_, invoke);
+  invoke->GetLocations()->AddTemp(Location::RequiresFpuRegister());
+}
+
+void IntrinsicCodeGeneratorARMVIXL::VisitIntegerBitCount(HInvoke* invoke) {
+  GenBitCount(invoke, Primitive::kPrimInt, GetAssembler());
+}
+
+void IntrinsicLocationsBuilderARMVIXL::VisitLongBitCount(HInvoke* invoke) {
+  VisitIntegerBitCount(invoke);
+}
+
+void IntrinsicCodeGeneratorARMVIXL::VisitLongBitCount(HInvoke* invoke) {
+  GenBitCount(invoke, Primitive::kPrimLong, GetAssembler());
+}
+
 void IntrinsicLocationsBuilderARMVIXL::VisitStringGetCharsNoCheck(HInvoke* invoke) {
   LocationSummary* locations = new (arena_) LocationSummary(invoke,
                                                             LocationSummary::kNoCall,
@@ -3112,9 +3157,6 @@ void IntrinsicCodeGeneratorARMVIXL::VisitIntegerValueOf(HInvoke* invoke) {
     __ Bind(&done);
   }
 }
-
-UNIMPLEMENTED_INTRINSIC(ARMVIXL, IntegerBitCount)
-UNIMPLEMENTED_INTRINSIC(ARMVIXL, LongBitCount)
 
 UNIMPLEMENTED_INTRINSIC(ARMVIXL, MathRoundDouble)   // Could be done by changing rounding mode, maybe?
 UNIMPLEMENTED_INTRINSIC(ARMVIXL, UnsafeCASLong)     // High register pressure.
