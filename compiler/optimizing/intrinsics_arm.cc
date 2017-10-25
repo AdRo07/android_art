@@ -2429,29 +2429,60 @@ static void GenBitCount(HInvoke* instr, Primitive::Type type, ArmAssembler* asse
   bool is_long = type == Primitive::kPrimLong;
   LocationSummary* locations = instr->GetLocations();
   Location in = locations->InAt(0);
-  Register src_0 = is_long ? in.AsRegisterPairLow<Register>() : in.AsRegister<Register>();
-  Register src_1 = is_long ? in.AsRegisterPairHigh<Register>() : src_0;
-  SRegister tmp_s = locations->GetTemp(0).AsFpuRegisterPairLow<SRegister>();
-  DRegister tmp_d = FromLowSToD(tmp_s);
+  Register s0 = is_long ? in.AsRegisterPairLow<Register>() : in.AsRegister<Register>();
+  Register s1 = is_long ? in.AsRegisterPairHigh<Register>() : s0;
   Register  out_r = locations->Out().AsRegister<Register>();
 
-  // Move data from core register(s) to temp D-reg for bit count calculation, then move back.
-  // According to Cortex A57 and A72 optimization guides, compared to transferring to full D-reg,
-  // transferring data from core reg to upper or lower half of vfp D-reg requires extra latency,
-  // That's why for integer bit count, we use 'vmov d0, r0, r0' instead of 'vmov d0[0], r0'.
-  __ vmovdrr(tmp_d, src_1, src_0);                         // Temp DReg |--src_1|--src_0|
-  __ vcntd(tmp_d, tmp_d);                                  // Temp DReg |c|c|c|c|c|c|c|c|
-  __ vpaddld(tmp_d, tmp_d, 8, /* is_unsigned */ true);     // Temp DReg |--c|--c|--c|--c|
-  __ vpaddld(tmp_d, tmp_d, 16, /* is_unsigned */ true);    // Temp DReg |------c|------c|
+  // https://stackoverflow.com/a/15740270
+  Register src_0 = locations->GetTemp(0).AsRegister<Register>();
+  Register tmp = locations->GetTemp(1).AsRegister<Register>();
+
+  __ Mov(src_0, s0);
+
+  __ Asrs(tmp, src_0, 1);
+  __ bic(tmp, tmp, ShifterOperand(0xAAAAAAAA));
+  __ subs(src_0, src_0, ShifterOperand(tmp));
+
+  __ Asrs(tmp, src_0, 2);
+  __ bic(out_r, tmp, ShifterOperand(0xCCCCCCCC));
+  __ bic(tmp, src_0, ShifterOperand(0xCCCCCCCC));
+  __ add(tmp, tmp, ShifterOperand(out_r));
+
+  __ add(tmp, tmp, ShifterOperand(tmp, LSR, 4));
+  __ bic(src_0, tmp, ShifterOperand(0xF0F0F0F0));
+  __ mvn(tmp, ShifterOperand(0xFEFEFEFE));
+  __ mul(tmp, src_0,  tmp);
+  __ Asrs(out_r, tmp, 0x18);
+
   if (is_long) {
-    __ vpaddld(tmp_d, tmp_d, 32, /* is_unsigned */ true);  // Temp DReg |--------------c|
+    Register src_1 = locations->GetTemp(2).AsRegister<Register>();
+
+    __ Mov(src_1, s1);
+
+    __ Asrs(tmp, src_1, 1);
+    __ bic(tmp, tmp, ShifterOperand(0xAAAAAAAA));
+    __ subs(src_1, src_1, ShifterOperand(tmp));
+
+    __ Asrs(tmp, src_1, 2);
+    __ bic(src_0, tmp, ShifterOperand(0xCCCCCCCC));
+    __ bic(tmp, src_1, ShifterOperand(0xCCCCCCCC));
+    __ add(tmp, tmp, ShifterOperand(src_0));
+
+    __ add(tmp, tmp, ShifterOperand(tmp, LSR, 4));
+    __ bic(src_1, tmp, ShifterOperand(0xF0F0F0F0));
+    __ mvn(tmp, ShifterOperand(0xFEFEFEFE));
+    __ mul(tmp, src_1,  tmp);
+    __ Asrs(src_1, tmp, 0x18);
+
+    __ add(out_r, out_r, ShifterOperand(src_1));
   }
-  __ vmovrs(out_r, tmp_s);
 }
 
 void IntrinsicLocationsBuilderARM::VisitIntegerBitCount(HInvoke* invoke) {
   CreateIntToIntLocations(arena_, invoke);
-  invoke->GetLocations()->AddTemp(Location::RequiresFpuRegister());
+  invoke->GetLocations()->AddTemp(Location::RequiresRegister());
+  invoke->GetLocations()->AddTemp(Location::RequiresRegister());
+  invoke->GetLocations()->AddTemp(Location::RequiresRegister());
 }
 
 void IntrinsicCodeGeneratorARM::VisitIntegerBitCount(HInvoke* invoke) {
